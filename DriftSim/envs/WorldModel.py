@@ -2,7 +2,7 @@ import numpy as np
 from skimage.draw import polygon
 import scipy
 
-class WorldModel:
+class World:
 
     def __init__(self, world_x, world_y, img_x, img_y, res, obst_list):
         self.img_x_px = int(img_x/res)
