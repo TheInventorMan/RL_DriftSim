@@ -30,8 +30,8 @@ class Car:
         # World Kinematics
         self.xw = 0
         self.yw = 0
-        self.yaw = 0
-        self.phi = 0
+        self.yaw = 0 # heading
+        self.phi = 0 # sideslip angle
 
         # CG Dynamics
         self.fx_cg = 0
@@ -49,12 +49,27 @@ class Car:
         self.RR.normal = self.mass/4
         self.RL.normal = self.mass/4
 
+    def resetSim(self, vel):
+        self.__init__()
+        self.vx = vel
+        self.FL.ang_vel = 2*vel/FL.wheel_dia
+        self.FR.ang_vel = 2*vel/FR.wheel_dia
+        self.RR.ang_vel = 2*vel/RR.wheel_dia
+        self.RL.ang_vel = 2*vel/RL.wheel_dia
+
     def applyControl(self, steer_ang, eng_cmd, dt):
         self.update_steer_ang(steer_ang)
         self.update_kinematics(dt)
         self.update_net_force()
         self.update_norms()
         self.solve_powertrain(eng_cmd, dt)
+
+    def zohControl(self, dt):
+        self.update_steer_ang(self.steer_ang)
+        self.update_kinematics(dt)
+        self.update_net_force()
+        self.update_norms()
+        self.solve_powertrain(0, dt)
 
     def update_steer_ang(self, angle):
         self.steer_ang = angle
