@@ -49,9 +49,13 @@ class Car:
         self.RR.normal = self.mass/4
         self.RL.normal = self.mass/4
 
-    def resetSim(self, vel):
+    def resetSim(self, vel, px, py):
         self.__init__()
+        
+        self.xw = px
+        self.yw = py
         self.vx = vel
+
         self.FL.ang_vel = 2*vel/FL.wheel_dia
         self.FR.ang_vel = 2*vel/FR.wheel_dia
         self.RR.ang_vel = 2*vel/RR.wheel_dia
