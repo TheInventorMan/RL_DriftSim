@@ -9,9 +9,12 @@ class World:
         self.img_y_px = int(img_dims[1]/res)
         self.world_x_px = int(world_dims[0]/res)
         self.world_y_px = int(world_dims[1]/res)
+        self.res = res
 
         self.car_dims = car_dims
         self.goal_coords = goal_coords
+
+        self.collision = False
 
         self.world = np.zeros((self.world_x_px, self.world_y_px, 1), 'uint_8')
         for obst in obst_list:
@@ -32,7 +35,7 @@ class World:
                              self.world_y_px//2 - self.img_y_px//2 : self.world_y_px//2 + self.img_y_px//2, :]
 
         self.current_value = self.get_value(x, y, theta, wb, track)
-        return self.image, self.current_value
+        return self.image, self.current_value, self.collision
 
     def get_value(self, x, y, theta):
         # potential field value
@@ -42,7 +45,16 @@ class World:
         dist_val = a_dist - np.sqrt((self.goal_coords[0] - x)**2 + (self.goal_coords[1] - y)**2))
 
         wb, track = self.car_dims
-        obst_val = 0 # TODO: check for collisions
+
+        vehicle_val = sum(self.image[self.img_x_px//2 - self.res*track//2 : self.img_x_px//2 + self.res*track//2,
+                          self.img_y_px//2 - self.res*wb//2 : self.img_y_px//2 + self.res*wb//2, :])
+
+        self.collision = (vehicle_val > 0)
+
+        x_radius = self.res*(track//2 + 1.5)
+        y_radius = self.res*(wb//2 + 2.5)
+        obst_val = a_obst - sum(self.image[self.img_x_px//2 - x_radius : self.img_x_px//2 + x_radius,
+                                self.img_y_px//2 - y_radius : self.img_y_px//2 + y_radius, :])
 
         value = dist_val + obst_val
         return value
