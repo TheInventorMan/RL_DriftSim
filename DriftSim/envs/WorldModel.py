@@ -18,7 +18,8 @@ class World:
 
         self.world = np.zeros((self.world_x_px, self.world_y_px, 1), 'uint_8')
         for obst in obst_list:
-            rr, cc = polygon(obst[:,0], obst[:,1], self.world.shape)
+            obst_px = obst*self.res
+            rr, cc = polygon(obst_px[:,0], obst_px[:,1], self.world.shape)
             self.world[rr,cc,0] = 1
 
     def observe_world(self, x, y, theta):

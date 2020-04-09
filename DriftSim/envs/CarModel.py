@@ -4,20 +4,22 @@ import numpy as np
 
 class Car:
     def __init__(self):
+        # Modelled after Mercedes CLS 63 AMG
         # Constants
-        self.wheelbase = 2.5
-        self.track = 1.5
-        self.cgz = 0.75
-        self.mass = 1500 # kg
-        self.Iz = 100 # ???
+        self.wheelbase = 2.854
+        self.track = 1.446
+        self.cgz = 0.53
+        self.mass = 2220 # kg
+        self.Iz = 1549   # kg.m^2
         self.mu = 1
 
         # Powertrain
         self.eng_angvel = 0
-        self.Ie = 100
-        self.Iw = 100
+        self.Ie = 0.44
+        self.Iw = 1.85
 
         self.steer_ang = 0
+        self.eng_cmd = 0
 
         # CG Kinematics
         self.ax = 0
@@ -39,10 +41,10 @@ class Car:
         self.mz_cg = 0
 
         # init all 4 tires here
-        self.FL = FrontLeftWheel(self.wheelbase/2, self.track/2)
-        self.FR = FrontRightWheel(self.wheelbase/2, -self.track/2)
-        self.RR = RearRightWheel(-self.wheelbase/2, -self.track/2)
-        self.RL = RearLeftWheel(-self.wheelbase/2, self.track/2)
+        self.FL = FrontWheel(self.wheelbase/2, self.track/2)
+        self.FR = FrontWheel(self.wheelbase/2, -self.track/2)
+        self.RR = RearWheel(-self.wheelbase/2, -self.track/2)
+        self.RL = RearWheel(-self.wheelbase/2, self.track/2)
 
         self.FL.normal = self.mass/4
         self.FR.normal = self.mass/4
@@ -51,7 +53,7 @@ class Car:
 
     def resetSim(self, vel, px, py):
         self.__init__()
-        
+
         self.xw = px
         self.yw = py
         self.vx = vel
@@ -61,19 +63,20 @@ class Car:
         self.RR.ang_vel = 2*vel/RR.wheel_dia
         self.RL.ang_vel = 2*vel/RL.wheel_dia
 
-    def applyControl(self, steer_ang, eng_cmd, dt):
-        self.update_steer_ang(steer_ang)
-        self.update_kinematics(dt)
-        self.update_net_force()
-        self.update_norms()
-        self.solve_powertrain(eng_cmd, dt)
+    def explicitControl(self, steer_ang, eng_cmd, dt):
+        self.steer_ang = steer_ang
+        self.eng_cmd = eng_cmd
+        self.applyControlInc(0, 0, dt)
 
-    def zohControl(self, dt):
+    def applyControlInc(self, dsteer_ang, deng_cmd, dt):
+        self.steer_ang += dsteer_ang
+        self.eng_cmd += deng_cmd
+
         self.update_steer_ang(self.steer_ang)
         self.update_kinematics(dt)
         self.update_net_force()
         self.update_norms()
-        self.solve_powertrain(0, dt)
+        self.solve_powertrain(self.eng_cmd, dt)
 
     def update_steer_ang(self, angle):
         self.steer_ang = angle
