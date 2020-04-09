@@ -61,7 +61,7 @@ class Tire:
         self.ang_vel = 0
 
         # Initialize peak force values
-        self.init_peakf()
+        self._init_peakf()
 
     def getContactForces(self, N, mu, rot_trans, vx, vy):
 
@@ -73,11 +73,11 @@ class Tire:
         sigma = (rot_trans - vx) / max(abs(vx), 0.001)
         alpha = -np.arctan2(vy / max(abs(vx), 0.001), 1) * 180 / np.pi
 
-        self.fx0 = self.compute_Fx(sigma, self.fz, mu)
-        self.fy0 = self.compute_Fy(alpha, self.fz, mu)
-        self.mz = self.compute_Mz(alpha, self.fz, mu)
-        self.gx = self.compute_Gx(sigma, alpha)
-        self.gy = self.compute_Gy(sigma, alpha)
+        self.fx0 = self._compute_Fx(sigma, self.fz, mu)
+        self.fy0 = self._compute_Fy(alpha, self.fz, mu)
+        self.mz = self._compute_Mz(alpha, self.fz, mu)
+        self.gx = self._compute_Gx(sigma, alpha)
+        self.gy = self._compute_Gy(sigma, alpha)
 
         self.fx = self.fx0 * self.gx
         self.fy = self.fy0 * self.gy
@@ -85,13 +85,13 @@ class Tire:
         self.slip_r = sigma
         self.slip_ang = alpha * np.pi/180
 
-        self.compute_peakf(N)
+        self._compute_peakf(N)
         self.peakf_slip_r = self.sigma_hat
         self.peakf_slip_ang = self.alpha_hat * np.pi/180
 
         return (self.fx, self.fy)
 
-    def init_peakf(self):
+    def _init_peakf(self):
         for i in range(20):
             N = (i+1)/2
             f_max = 0
@@ -99,7 +99,7 @@ class Tire:
             dx = [i/100 for i in range(100)]
 
             for x in dx:
-                Fx = self.compute_Fx(x, N, 1)
+                Fx = self._compute_Fx(x, N, 1)
                 if (Fx > f_max):
                     self.sh[i] = x
                     f_max = Fx
@@ -110,7 +110,7 @@ class Tire:
             y_max = 40
             dy = [i*40/100 for i in range(100)]
             for y in dy:
-                Fy = self.compute_Fy(y, N, 1)
+                Fy = self._compute_Fy(y, N, 1)
                 if (Fy > f_max):
                     self.ah[i] = y
                     f_max = Fy
@@ -118,7 +118,7 @@ class Tire:
                     break
         return
 
-    def compute_peakf(self, N):
+    def _compute_peakf(self, N):
         n = max(0, min(N/500.0-1, 18.999))
         i = int(n)
         avg_factor = n - i
@@ -126,7 +126,7 @@ class Tire:
         self.alpha_hat = self.ah[i] * (1-avg_factor) + self.ah[i+1] * avg_factor
 
 
-    def compute_Fx(self, sigma, Fz, mu):
+    def _compute_Fx(self, sigma, Fz, mu):
 
         b = self.b
 
@@ -143,7 +143,7 @@ class Tire:
         return fx
 
 
-    def compute_Fy(self, alpha, Fz, mu):
+    def _compute_Fy(self, alpha, Fz, mu):
 
         a = self.a
 
@@ -161,7 +161,7 @@ class Tire:
         fy = mu * D * np.sin(C * np.arctan2(B * S - E * (B * S - np.arctan2(B * S, 1)), 1)) + Sv
         return fy
 
-    def compute_Mz(self, alpha, Fz, mu):
+    def _compute_Mz(self, alpha, Fz, mu):
         c = self.c
 
         C = c[0]
@@ -178,14 +178,14 @@ class Tire:
         mz = mu * D * np.sin(c[0] * np.arctan(B * S - E * (B * S - np.arctan(B * S)))) + Sv
         return mz
 
-    def compute_Gx(self, sigma, alpha):
+    def _compute_Gx(self, sigma, alpha):
         g = self.g
         alpha *= np.pi/180
         B = g[0] / np.sqrt(1 + (g[1]*sigma)**2)
         gx = 1 / np.sqrt(1 + (B*alpha)**2)
         return gx
 
-    def compute_Gy(self, sigma, alpha):
+    def _compute_Gy(self, sigma, alpha):
         g = self.g
         alpha *= np.pi/180
         B = g[2] / np.sqrt(1 + (g[3]*alpha)**2)

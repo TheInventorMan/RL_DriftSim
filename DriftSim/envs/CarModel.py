@@ -63,28 +63,34 @@ class Car:
         self.RR.ang_vel = 2*vel/RR.wheel_dia
         self.RL.ang_vel = 2*vel/RL.wheel_dia
 
+    def getState(self):
+        ctrl = (self.steer_ang, self.eng_cmd)
+        w_kin = (self.xw, self.yx, self.yaw, self.phi)
+        cg_kin = (self.ax, self.ay, self.vx, self.vy)
+        return {"control" : ctrl , "world" : w_kin, "cg" : cg_kin}
+
     def explicitControl(self, steer_ang, eng_cmd, dt):
         self.steer_ang = steer_ang
         self.eng_cmd = eng_cmd
-        self.applyControlInc(0, 0, dt)
+        self.applyControl(0, 0, dt)
 
-    def applyControlInc(self, dsteer_ang, deng_cmd, dt):
+    def applyControl(self, dsteer_ang, deng_cmd, dt):
         self.steer_ang += dsteer_ang
         self.eng_cmd += deng_cmd
 
-        self.update_steer_ang(self.steer_ang)
-        self.update_kinematics(dt)
-        self.update_net_force()
-        self.update_norms()
-        self.solve_powertrain(self.eng_cmd, dt)
+        self._update_steer_ang(self.steer_ang)
+        self._update_kinematics(dt)
+        self._update_net_force()
+        self._update_norms()
+        self._solve_powertrain(self.eng_cmd, dt)
 
-    def update_steer_ang(self, angle):
+    def _update_steer_ang(self, angle):
         self.steer_ang = angle
         R = self.wheelbase / np.tan(angle)
         self.FL.steer_ang = np.arctan2(self.wheelbase, (R - self.track/2))
         self.FR.steer_ang = np.arctan2(self.wheelbase, (R + self.track/2))
 
-    def update_kinematics(self, dt):
+    def _update_kinematics(self, dt):
         # Car frame
         self.ax = self.fx_cg/self.mass
         self.ay = self.fy_cg/self.mass
@@ -99,7 +105,7 @@ class Car:
         self.xw += dt*(self.vx*np.cos(self.yaw) + self.vy*np.sin(self.yaw))
         self.yw += dt*(-self.vx*np.sin(self.yaw) + self.vy*np.cos(self.yaw))
 
-    def update_net_force(self):
+    def _update_net_force(self):
         #compute net force on cg from each of the tires
         FL_x, FL_y = self.FL.computeForces(self.mu, self.vx, self.vy, self.yaw_rate)
         FR_x, FR_y = self.FR.computeForces(self.mu, self.vx, self.vy, self.yaw_rate)
@@ -115,14 +121,14 @@ class Car:
                      -RR_x * self.RR.pos[1] + RR_y * self.RR.pos[0] \
                      -RL_x * self.RL.pos[1] + RL_y * self.RL.pos[0]
 
-    def update_norms(self):
+    def _update_norms(self):
         # X front, Y left
         self.FL.normal = self.mass/4 - self.mass/2 * self.cgz * (self.ay / self.FL.pos[1] + self.ax / self.FL.pos[0])
         self.FR.normal = self.mass/4 - self.mass/2 * self.cgz * (self.ay / self.FR.pos[1] + self.ax / self.FR.pos[0])
         self.RR.normal = self.mass/4 - self.mass/2 * self.cgz * (self.ay / self.RR.pos[1] + self.ax / self.RR.pos[0])
         self.RL.normal = self.mass/4 - self.mass/2 * self.cgz * (self.ay / self.RL.pos[1] + self.ax / self.RL.pos[0])
 
-    def solve_powertrain(self, tau_in, dt):
+    def _solve_powertrain(self, tau_in, dt):
 
         dL_in = tau_in * dt
         dL_e = dL_in * self.Ie / (self.Ie + 4*self.Iw)

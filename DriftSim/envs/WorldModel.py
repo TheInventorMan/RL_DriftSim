@@ -35,10 +35,11 @@ class World:
         self.image = rotated[self.world_x_px//2 - self.img_x_px//2 : self.world_x_px//2 + self.img_y_px//2,
                              self.world_y_px//2 - self.img_y_px//2 : self.world_y_px//2 + self.img_y_px//2, :]
 
-        self.current_value = self.get_value(x, y, theta, wb, track)
-        return self.image, self.current_value, self.collision
+        self.current_value = self._get_value(x, y, theta, wb, track)
 
-    def get_value(self, x, y, theta):
+        return self.image, self.current_value, self.collision, self.complete
+
+    def _get_value(self, x, y, theta):
         # potential field value
         a_dist = 1000
         a_obst = 1000
@@ -51,6 +52,7 @@ class World:
                           self.img_y_px//2 - self.res*wb//2 : self.img_y_px//2 + self.res*wb//2, :])
 
         self.collision = (vehicle_val > 0)
+        self.complete = (abs(dist_val - a_dist) < 0.1)
 
         x_radius = self.res*(track//2 + 1.5)
         y_radius = self.res*(wb//2 + 2.5)
