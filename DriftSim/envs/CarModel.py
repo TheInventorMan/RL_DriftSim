@@ -65,7 +65,7 @@ class Car:
 
     def getState(self):
         ctrl = (self.steer_ang, self.eng_cmd)
-        w_kin = (self.xw, self.yx, self.yaw, self.phi)
+        w_kin = (self.xw, self.yw, self.yaw, self.phi)
         cg_kin = (self.ax, self.ay, self.vx, self.vy)
         return {"control" : ctrl , "world" : w_kin, "cg" : cg_kin}
 
@@ -86,6 +86,11 @@ class Car:
 
     def _update_steer_ang(self, angle):
         self.steer_ang = angle
+        if abs(angle) < 0.01:
+            self.FL.steer_ang = 0.0
+            self.FR.steer_ang = 0.0
+            return
+
         R = self.wheelbase / np.tan(angle)
         self.FL.steer_ang = np.arctan2(self.wheelbase, (R - self.track/2))
         self.FR.steer_ang = np.arctan2(self.wheelbase, (R + self.track/2))
@@ -101,7 +106,7 @@ class Car:
 
         # World frame
         self.yaw += self.yaw_rate*dt
-        self.phi = self.yaw - np.arctan2(self.vy,self.vx)
+        self.phi = self.yaw + np.arctan2(self.vy,self.vx)
         self.xw += dt*(self.vx*np.cos(self.yaw) + self.vy*np.sin(self.yaw))
         self.yw += dt*(-self.vx*np.sin(self.yaw) + self.vy*np.cos(self.yaw))
 
@@ -131,7 +136,7 @@ class Car:
     def _solve_powertrain(self, tau_in, dt):
 
         dL_in = tau_in * dt
-        dL_e = dL_in * self.Ie / (self.Ie + 4*self.Iw)
+        dL_e = dL_in * self.Ie / (self.Ie + 4*self.Iw) / dt
 
         self.eng_angvel += dL_e/self.Ie
 
