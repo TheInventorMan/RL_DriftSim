@@ -3,6 +3,11 @@ from TireModel import *
 import numpy as np
 
 class Car:
+
+    DEBUG_NF = True
+    DEBUG_KIN = True
+    DEBUG_PT = True
+
     def __init__(self):
         # Modelled after Mercedes CLS 63 AMG
         # Constants
@@ -32,8 +37,8 @@ class Car:
         # World Kinematics
         self.xw = 0
         self.yw = 0
-        self.yaw = 0 # heading
-        self.phi = 0 # sideslip angle
+        self.yaw = 0 # car angle wrt world
+        self.phi = 0 # motion heading
 
         # CG Dynamics
         self.fx_cg = 0
@@ -51,6 +56,9 @@ class Car:
         self.RR.normal = self.mass/4
         self.RL.normal = self.mass/4
 
+        self.run = 0
+        self.ctr = 0
+
     def resetSim(self, vel, px, py):
         self.__init__()
 
@@ -67,7 +75,8 @@ class Car:
         ctrl = (self.steer_ang, self.eng_cmd)
         w_kin = (self.xw, self.yw, self.yaw, self.phi)
         cg_kin = (self.ax, self.ay, self.vx, self.vy)
-        return {"control" : ctrl , "world" : w_kin, "cg" : cg_kin}
+        cg_dyn = (self.fx_cg, self.fy_cg, self.mz_cg)
+        return {"control" : ctrl , "world" : w_kin, "kin" : cg_kin, "dyn" : cg_dyn}
 
     def explicitControl(self, steer_ang, eng_cmd, dt):
         self.steer_ang = steer_ang
@@ -75,14 +84,15 @@ class Car:
         self.applyControl(0, 0, dt)
 
     def applyControl(self, dsteer_ang, deng_cmd, dt):
-        self.steer_ang += dsteer_ang
-        self.eng_cmd += deng_cmd
+        self.steer_ang += dsteer_ang * dt
+        self.eng_cmd += deng_cmd * dt
 
         self._update_steer_ang(self.steer_ang)
-        self._update_kinematics(dt)
         self._update_net_force()
         self._update_norms()
+        self._update_kinematics(dt)
         self._solve_powertrain(self.eng_cmd, dt)
+
 
     def _update_steer_ang(self, angle):
         self.steer_ang = angle
@@ -102,13 +112,27 @@ class Car:
         self.vx += self.ax * dt
         self.vy += self.ay * dt
 
-        self.yaw_rate = dt*self.mz_cg/self.Iz
+        self.yaw_rate += dt*self.mz_cg/self.Iz
 
         # World frame
         self.yaw += self.yaw_rate*dt
-        self.phi = self.yaw + np.arctan2(self.vy,self.vx)
-        self.xw += dt*(self.vx*np.cos(self.yaw) + self.vy*np.sin(self.yaw))
-        self.yw += dt*(-self.vx*np.sin(self.yaw) + self.vy*np.cos(self.yaw))
+        self.phi = np.arctan2(self.vy,self.vx) # heading
+        self.xw += dt*(self.vx*np.cos(self.phi) - self.vy*np.sin(self.phi))
+        self.yw += dt*(self.vx*np.sin(self.phi) + self.vy*np.cos(self.phi))
+
+        if self.DEBUG_KIN:
+            print("")
+            print("_____________Kinematics Update________________")
+            print("vx:", self.vx)
+            print("vy:", self.vy)
+            print("ax:", self.ax)
+            print("ay:", self.ay)
+            print("")
+            print("xw:", self.xw)
+            print("yw:", self.yw)
+            print("yaw:", self.yaw)
+
+
 
     def _update_net_force(self):
         #compute net force on cg from each of the tires
@@ -118,32 +142,63 @@ class Car:
         RR_x, RR_y = self.RR.computeForces(self.mu, self.vx, self.vy, self.yaw_rate)
         RL_x, RL_y = self.RL.computeForces(self.mu, self.vx, self.vy, self.yaw_rate)
 
+
+
         self.fx_cg = FL_x + FR_x + RR_x + RL_x
         self.fy_cg = FL_y + FR_y + RR_y + RL_y
 
         self.mz_cg = -FL_x * self.FL.pos[1] + FL_y * self.FL.pos[0] \
-                     -FR_x * self.FL.pos[1] + FL_y * self.FL.pos[0] \
+                     -FR_x * self.FR.pos[1] + FR_y * self.FR.pos[0] \
                      -RR_x * self.RR.pos[1] + RR_y * self.RR.pos[0] \
                      -RL_x * self.RL.pos[1] + RL_y * self.RL.pos[0]
+        self.run += self.mz_cg
+        self.ctr += 1
+
+        if self.DEBUG_NF:
+            print("")
+            print("_____________Net Force Update________________")
+            print("vx:", self.vx)
+            print("vy:", self.vy)
+            print("yaw_rate:", self.yaw_rate)
+            print("")
+            print("fx:", FL_x,FR_x,RR_x,RL_x)
+            print("fy:", FL_y,FR_y,RR_y,RL_y)
+            print("mz avg:", self.run/self.ctr)
+            print("ang_vel:", self.FL.ang_vel, self.FR.ang_vel, self.RR.ang_vel, self.RL.ang_vel)
 
     def _update_norms(self):
         # X front, Y left
-        self.FL.normal = self.mass/4 - self.mass/2 * self.cgz * (self.ay / self.FL.pos[1] + self.ax / self.FL.pos[0])
-        self.FR.normal = self.mass/4 - self.mass/2 * self.cgz * (self.ay / self.FR.pos[1] + self.ax / self.FR.pos[0])
-        self.RR.normal = self.mass/4 - self.mass/2 * self.cgz * (self.ay / self.RR.pos[1] + self.ax / self.RR.pos[0])
-        self.RL.normal = self.mass/4 - self.mass/2 * self.cgz * (self.ay / self.RL.pos[1] + self.ax / self.RL.pos[0])
+        self.FL.normal = self.mass/4 #- self.mass/2 * self.cgz * (self.ay / self.FL.pos[1] + self.ax / self.FL.pos[0])
+        self.FR.normal = self.mass/4 #- self.mass/2 * self.cgz * (self.ay / self.FR.pos[1] + self.ax / self.FR.pos[0])
+        self.RR.normal = self.mass/4 #- self.mass/2 * self.cgz * (self.ay / self.RR.pos[1] + self.ax / self.RR.pos[0])
+        self.RL.normal = self.mass/4 #- self.mass/2 * self.cgz * (self.ay / self.RL.pos[1] + self.ax / self.RL.pos[0])
 
     def _solve_powertrain(self, tau_in, dt):
 
         dL_in = tau_in * dt
-        dL_e = dL_in * self.Ie / (self.Ie + 4*self.Iw) / dt
+        dL_e = dL_in * self.Ie / (self.Ie + 4*self.Iw)
 
         self.eng_angvel += dL_e/self.Ie
 
         dL_front = 2*dL_e*self.Iw/self.Ie + dt*(self.FL.getBacktorque() + self.FR.getBacktorque())
         dL_rear = 2*dL_e*self.Iw/self.Ie + dt*(self.RL.getBacktorque() + self.RR.getBacktorque())
 
-        self.FL.ang_vel += (dL_front-self.FL.getBacktorque())/(2*self.Iw)
-        self.FR.ang_vel += (dL_front-self.FR.getBacktorque())/(2*self.Iw)
-        self.RR.ang_vel += (dL_rear-self.RR.getBacktorque())/(2*self.Iw)
-        self.RL.ang_vel += (dL_rear-self.RL.getBacktorque())/(2*self.Iw)
+        FL_del = (dL_front-self.FL.getBacktorque()*dt)/(2*self.Iw)
+        FR_del = (dL_front-self.FR.getBacktorque()*dt)/(2*self.Iw)
+        RR_del = (dL_rear-self.RR.getBacktorque()*dt)/(2*self.Iw)
+        RL_del = (dL_rear-self.RL.getBacktorque()*dt)/(2*self.Iw)
+
+        self.FL.ang_vel += FL_del
+        self.FR.ang_vel += FR_del
+        self.RR.ang_vel += RR_del
+        self.RL.ang_vel += RL_del
+
+        if self.DEBUG_PT:
+            print("")
+            print("_____________Powertrain Update________________")
+            print("dL_in:", dL_in)
+            print("dL_e:", dL_e)
+            print("dL_front:", dL_front)
+            print("dL_rear:", dL_rear)
+            print("")
+            print("ang_vel deltas:", FL_del, FR_del, RR_del, RL_del)
