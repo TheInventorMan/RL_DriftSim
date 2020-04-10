@@ -74,5 +74,4 @@ class DriftSim(gym.Env):
         self.potfield_value = 0
 
     def render(self, mode='human', close=False):
-        # Render the environment to the screen
-        pass
+        print(self.state)
