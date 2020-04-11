@@ -56,6 +56,11 @@ class Car:
         self.RR.normal = self.mass/4
         self.RL.normal = self.mass/4
 
+        self.FL_ang_imp = 0
+        self.FR_ang_imp = 0
+        self.RR_ang_imp = 0
+        self.RL_ang_imp = 0
+
         self.run = 0
         self.ctr = 0
 
@@ -88,11 +93,15 @@ class Car:
         self.eng_cmd += deng_cmd * dt
 
         self._update_steer_ang(self.steer_ang)
+        self._apply_ground_imp(dt)
+        self._apply_engine_imp(self.eng_cmd, dt)
+        self._update_kinematics(dt/2)
+
         self._update_net_force()
         self._update_norms()
-        self._update_kinematics(dt)
-        self._solve_powertrain(self.eng_cmd, dt)
 
+        self._solve_powertrain(dt)
+        self._update_kinematics(dt/2)
 
     def _update_steer_ang(self, angle):
         self.steer_ang = angle
@@ -132,8 +141,6 @@ class Car:
             print("yw:", self.yw)
             print("yaw:", self.yaw)
 
-
-
     def _update_net_force(self):
         #compute net force on cg from each of the tires
         FL_x, FL_y = self.FL.computeForces(self.mu, self.vx, self.vy, self.yaw_rate)
@@ -141,8 +148,6 @@ class Car:
 
         RR_x, RR_y = self.RR.computeForces(self.mu, self.vx, self.vy, self.yaw_rate)
         RL_x, RL_y = self.RL.computeForces(self.mu, self.vx, self.vy, self.yaw_rate)
-
-
 
         self.fx_cg = FL_x + FR_x + RR_x + RL_x
         self.fy_cg = FL_y + FR_y + RR_y + RL_y
@@ -173,20 +178,49 @@ class Car:
         self.RR.normal = self.mass/4 #- self.mass/2 * self.cgz * (self.ay / self.RR.pos[1] + self.ax / self.RR.pos[0])
         self.RL.normal = self.mass/4 #- self.mass/2 * self.cgz * (self.ay / self.RL.pos[1] + self.ax / self.RL.pos[0])
 
-    def _solve_powertrain(self, tau_in, dt):
-
-        dL_in = tau_in * dt
+    def _apply_engine_imp(self, tau_in, dt):
+        dL_in = tau_in * dt ##################
         dL_e = dL_in * self.Ie / (self.Ie + 4*self.Iw)
 
         self.eng_angvel += dL_e/self.Ie
 
-        dL_front = 2*dL_e*self.Iw/self.Ie + dt*(self.FL.getBacktorque() + self.FR.getBacktorque())
-        dL_rear = 2*dL_e*self.Iw/self.Ie + dt*(self.RL.getBacktorque() + self.RR.getBacktorque())
+        self.FL_ang_imp = (dL_in - dL_e)/(4*self.Iw)
+        self.FR_ang_imp = (dL_in - dL_e)/(4*self.Iw)
+        self.RR_ang_imp = (dL_in - dL_e)/(4*self.Iw)
+        self.RL_ang_imp = (dL_in - dL_e)/(4*self.Iw)
 
-        FL_del = (dL_front-self.FL.getBacktorque()*dt)/(2*self.Iw)
-        FR_del = (dL_front-self.FR.getBacktorque()*dt)/(2*self.Iw)
-        RR_del = (dL_rear-self.RR.getBacktorque()*dt)/(2*self.Iw)
-        RL_del = (dL_rear-self.RL.getBacktorque()*dt)/(2*self.Iw)
+        self.FL.ang_vel += self.FL_ang_imp
+        self.FR.ang_vel += self.FR_ang_imp
+        self.RR.ang_vel += self.RR_ang_imp
+        self.RL.ang_vel += self.RL_ang_imp
+
+        if self.DEBUG_PT:
+            print("")
+            print("_____________Input Update________________")
+            print("dL_in:", dL_in)
+            print("dL_e:", dL_e)
+
+
+    def _apply_ground_imp(self, dt):
+        self.FL.ang_vel -= self.FL.getBacktorque()*dt/self.Iw
+        self.FR.ang_vel -= self.FR.getBacktorque()*dt/self.Iw
+        self.RR.ang_vel -= self.RR.getBacktorque()*dt/self.Iw
+        self.RL.ang_vel -= self.RL.getBacktorque()*dt/self.Iw
+
+############# NEED TO FIX
+    def _solve_powertrain(self, dt): ### FIX
+
+        #dL_front = 2*dL_e*self.Iw/self.Ie + dt*(self.FL.getBacktorque() + self.FR.getBacktorque())
+        #dL_rear = 2*dL_e*self.Iw/self.Ie + dt*(self.RL.getBacktorque() + self.RR.getBacktorque())
+
+        dL_front = dt*(self.FL.getBacktorque() + self.FR.getBacktorque())
+        dL_rear = dt*(self.RL.getBacktorque() + self.RR.getBacktorque())
+
+        FL_del = (dL_front-self.FL.getBacktorque()*dt)/(self.Iw)
+        FR_del = (dL_front-self.FR.getBacktorque()*dt)/(self.Iw)
+        RR_del = (dL_rear-self.RR.getBacktorque()*dt)/(self.Iw)
+        RL_del = (dL_rear-self.RL.getBacktorque()*dt)/(self.Iw)
+##############
 
         self.FL.ang_vel += FL_del
         self.FR.ang_vel += FR_del
@@ -196,8 +230,6 @@ class Car:
         if self.DEBUG_PT:
             print("")
             print("_____________Powertrain Update________________")
-            print("dL_in:", dL_in)
-            print("dL_e:", dL_e)
             print("dL_front:", dL_front)
             print("dL_rear:", dL_rear)
             print("")
