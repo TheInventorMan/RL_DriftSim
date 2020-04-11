@@ -47,7 +47,7 @@ def test1():
             print(myCar.getState()["dyn"])
             print(" ")
     _ = input("_")
-    myCar.explicitControl(0, 0, 0.01)
+    myCar.explicitControl(0, -200, 0.01)
     print("*******************************************************************************************************************")
     for i in range(21):
         myCar.applyControl(0, 0, 0.01)

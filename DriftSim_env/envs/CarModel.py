@@ -92,16 +92,17 @@ class Car:
         self.steer_ang += dsteer_ang * dt
         self.eng_cmd += deng_cmd * dt
 
-        self._update_steer_ang(self.steer_ang)
-        self._apply_ground_imp(dt)
-        self._apply_engine_imp(self.eng_cmd, dt)
-        self._update_kinematics(dt/2)
-
         self._update_net_force()
         self._update_norms()
 
         self._solve_powertrain(dt)
         self._update_kinematics(dt/2)
+
+        self._update_steer_ang(self.steer_ang)
+        self._apply_ground_imp(dt)
+        self._apply_engine_imp(self.eng_cmd, dt)
+        self._update_kinematics(dt/2)
+
 
     def _update_steer_ang(self, angle):
         self.steer_ang = angle
@@ -179,7 +180,7 @@ class Car:
         self.RL.normal = self.mass/4 #- self.mass/2 * self.cgz * (self.ay / self.RL.pos[1] + self.ax / self.RL.pos[0])
 
     def _apply_engine_imp(self, tau_in, dt):
-        dL_in = tau_in * dt ##################
+        dL_in = tau_in * dt
         dL_e = dL_in * self.Ie / (self.Ie + 4*self.Iw)
 
         self.eng_angvel += dL_e/self.Ie
