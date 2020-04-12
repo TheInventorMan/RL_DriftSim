@@ -89,7 +89,7 @@ class Tire:
         self.peakf_slip_r = self.sigma_hat
         self.peakf_slip_ang = self.alpha_hat * np.pi/180
 
-        return (self.fx, -self.fy)
+        return (self.fx, self.fy)
 
     def _init_peakf(self):
         for i in range(20):
@@ -189,5 +189,5 @@ class Tire:
         g = self.g
         alpha *= np.pi/180
         B = g[2] / np.sqrt(1 + (g[3]*alpha)**2)
-        gy = 1 / np.sqrt(1 + (B*sigma)**2)
+        gy = -1 / np.sqrt(1 + (B*sigma)**2)
         return gy
